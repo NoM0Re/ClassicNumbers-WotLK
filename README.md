@@ -32,7 +32,7 @@ Use damage school colors: fire damage will be orange, frost damage will be blue,
 
 ## Client Extensions
 
-* [Awesome WotLK](https://github.com/NoM0Re/WeakAuras-WotLK/wiki/awesome_wotlk): Adds modern retail-style nameplate search functions, unit tracking, and events. Additionally adds the modern Text-to-Speech functions to the client. This adds a lot of additional functionality to WeakAuras, that are not enabled without it.
+* [Awesome WotLK](https://github.com/NoM0Re/WeakAuras-WotLK/wiki/awesome_wotlk): Adds modern retail-style nameplate search functions, unit tracking, and events. Additionally adds the modern Text-to-Speech functions to the client. This is required to operate the AddOn.
 
 ## Install
 1. This AddOn requires [Awesome WotLK](https://github.com/NoM0Re/WeakAuras-WotLK/wiki/awesome_wotlk) without it is not possible to use it, and will error or not work!

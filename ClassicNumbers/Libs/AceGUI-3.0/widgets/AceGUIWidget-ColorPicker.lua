@@ -1,7 +1,7 @@
 --[[-----------------------------------------------------------------------------
 ColorPicker Widget
 -------------------------------------------------------------------------------]]
-local Type, Version = "ColorPicker", 28
+local Type, Version = "ColorPicker", 29
 local AceGUI = LibStub and LibStub("AceGUI-3.0", true)
 if not AceGUI or (AceGUI:GetWidgetVersion(Type) or 0) >= Version then return end
 
@@ -13,7 +13,7 @@ local CreateFrame, UIParent = CreateFrame, UIParent
 
 -- Unfortunately we have no way to realistically detect if a client uses inverted alpha
 -- as no API will tell you. Wrath uses the old colorpicker, era uses the new one, both are inverted
-local INVERTED_ALPHA = (WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE)
+local INVERTED_ALPHA = true
 
 --[[-----------------------------------------------------------------------------
 Support functions
@@ -169,7 +169,7 @@ local methods = {
 Constructor
 -------------------------------------------------------------------------------]]
 local function Constructor()
-	local frame = CreateFrame("Button", nil, UIParent)
+	local frame = CreateFrame("Button", string.format("%s%d", Type, AceGUI:GetNextWidgetNum(Type)), UIParent)
 	frame:Hide()
 
 	frame:EnableMouse(true)
@@ -180,14 +180,14 @@ local function Constructor()
 	local colorSwatch = frame:CreateTexture(nil, "OVERLAY")
 	colorSwatch:SetWidth(19)
 	colorSwatch:SetHeight(19)
-	colorSwatch:SetTexture(130939) -- Interface\\ChatFrame\\ChatFrameColorSwatch
+	colorSwatch:SetTexture("Interface\\ChatFrame\\ChatFrameColorSwatch")
 	colorSwatch:SetPoint("LEFT")
 
 	local texture = frame:CreateTexture(nil, "BACKGROUND")
 	colorSwatch.background = texture
 	texture:SetWidth(16)
 	texture:SetHeight(16)
-	texture:SetColorTexture(1, 1, 1)
+	texture:SetTexture(1, 1, 1)
 	texture:SetPoint("CENTER", colorSwatch)
 	texture:Show()
 
@@ -195,7 +195,7 @@ local function Constructor()
 	colorSwatch.checkers = checkers
 	checkers:SetWidth(14)
 	checkers:SetHeight(14)
-	checkers:SetTexture(188523) -- Tileset\\Generic\\Checkers
+	checkers:SetTexture("Tileset\\Generic\\Checkers")
 	checkers:SetTexCoord(.25, 0, 0.5, .25)
 	checkers:SetDesaturated(true)
 	checkers:SetVertexColor(1, 1, 1, 0.75)
@@ -210,7 +210,7 @@ local function Constructor()
 	text:SetPoint("RIGHT")
 
 	--local highlight = frame:CreateTexture(nil, "HIGHLIGHT")
-	--highlight:SetTexture(136810) -- Interface\\QuestFrame\\UI-QuestTitleHighlight
+	--highlight:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
 	--highlight:SetBlendMode("ADD")
 	--highlight:SetAllPoints(frame)
 

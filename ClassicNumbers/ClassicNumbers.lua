@@ -2,14 +2,13 @@
 local AceAddon = LibStub("AceAddon-3.0");
 local LibEasing = LibStub("LibEasing-1.0");
 local SharedMedia = LibStub("LibSharedMedia-3.0");
+local ACD = LibStub("AceConfigDialog-3.0")
 
 ClassicNumbers = AceAddon:NewAddon("ClassicNumbers", "AceConsole-3.0", "AceEvent-3.0");
 ClassicNumbers.frame = CreateFrame("Frame", nil, UIParent);
 
-
 -- LOCALS --
 local animating = {}
-local optionsMenuName
 
 local playerGUID;
 local unitToGuid = {};
@@ -165,7 +164,7 @@ local function recycleFontString(fontString)
 	fontString.hideNonCritsIfBigCritChain = nil;
 	fontString.displayBiggestCritInCenterOfTheChain = nil;
 	fontString.biggestCritDisplaysLargerThanOtherOnes = nil;
-	
+
     fontString.animatingStartTime = nil;
     fontString.anchorFrame = nil;
 
@@ -183,7 +182,7 @@ end
 -- CORE --
 function ClassicNumbers:OnInitialize()
     self.db = LibStub("AceDB-3.0"):New("ClassicNumbersDB", defaults, true);
-	
+
     self:RegisterChatCommand("classicnumbers", "OpenMenu");
     self:RegisterChatCommand("classicnumber", "OpenMenu");
     self:RegisterChatCommand("cn", "OpenMenu");
@@ -232,7 +231,7 @@ end
 local function AnimationOnUpdate()
 	local animationDuration = 1;
     if (next(animating)) then
-		
+
         for fontString, _ in pairs(animating) do
             local elapsed = GetTime() - fontString.animatingStartTime;
 			if (fontString.pow) then
@@ -253,26 +252,26 @@ local function AnimationOnUpdate()
 
                 local alpha = 0;
 				if (elapsed/animationDuration < 0.3) then
-					if fontString.pow then 
+					if fontString.pow then
 						alpha = LibEasing.OutQuint(elapsed, 0, fontString.critsAlpha, animationDuration*0.3);
 					else
 						alpha = LibEasing.OutQuint(elapsed, 0, fontString.normalHitsAlpha, animationDuration*0.3);
 					end
 				else
-					if fontString.pow then 
+					if fontString.pow then
 						alpha = LibEasing.InExpo(elapsed, fontString.critsAlpha, -fontString.critsAlpha, animationDuration);
 					else
 						alpha = LibEasing.InExpo(elapsed, fontString.normalHitsAlpha, -fontString.normalHitsAlpha, animationDuration);
 					end
 				end
-				
+
 				fontString:SetAlpha(alpha);
 
                 -- crit size animation
                 if (fontString.pow) then
                     if (elapsed < 0.2) then
                         local size = powSizing(elapsed, 0.2, fontString.startHeight/2, fontString.startHeight*2, fontString.startHeight);
-                        
+
 						fontString:SetTextHeight(size);
 						fontString.fontHeight = size;
                     else
@@ -282,81 +281,81 @@ local function AnimationOnUpdate()
                         fontString:SetText(fontString.text);
                     end
                 end
-				
+
 				local newestCrit = GetNewestCrit(fontString.anchorFrame);
-				if (newestCrit ~= nil and fontString.isCritNumber[fontString.anchorFrame] ~= nil) then	
+				if (newestCrit ~= nil and fontString.isCritNumber[fontString.anchorFrame] ~= nil) then
 					-- handle crit position
 					if (fontString.isCritNumber[fontString.anchorFrame] == 1) then
 						fontString.offsetX = 0
-						fontString.offsetY = -40			
-						if fontString.maxCritNumbersPerTarget < 1 then 
+						fontString.offsetY = -40
+						if fontString.maxCritNumbersPerTarget < 1 then
 							fontString:SetAlpha(0);
-						end						
+						end
 					elseif (fontString.isCritNumber[fontString.anchorFrame] == 2) then
 						fontString.offsetX = newestCrit.textWidth + newestCrit.fontHeight + 9
 						fontString.offsetY = -40
-						if fontString.maxCritNumbersPerTarget < 2 then 
+						if fontString.maxCritNumbersPerTarget < 2 then
 							fontString:SetAlpha(0);
 						end
 					elseif (fontString.isCritNumber[fontString.anchorFrame] == 3) then
 						fontString.offsetX = -newestCrit.textWidth - newestCrit.fontHeight - 9
 						fontString.offsetY = -40
-						if fontString.maxCritNumbersPerTarget < 3 then 
+						if fontString.maxCritNumbersPerTarget < 3 then
 							fontString:SetAlpha(0);
 						end
 					elseif (fontString.isCritNumber[fontString.anchorFrame] == 4) then
-						fontString.offsetX = 0			
+						fontString.offsetX = 0
 						fontString.offsetY = newestCrit.offsetY + newestCrit.fontHeight + 9;
-						if fontString.maxCritNumbersPerTarget < 4 then 
+						if fontString.maxCritNumbersPerTarget < 4 then
 							fontString:SetAlpha(0);
 						end
-					elseif (fontString.isCritNumber[fontString.anchorFrame] == 5) then					
-						fontString.offsetX = 0			
+					elseif (fontString.isCritNumber[fontString.anchorFrame] == 5) then
+						fontString.offsetX = 0
 						fontString.offsetY = newestCrit.offsetY - newestCrit.fontHeight - 9;
-						if fontString.maxCritNumbersPerTarget < 5 then 
+						if fontString.maxCritNumbersPerTarget < 5 then
 							fontString:SetAlpha(0);
-						end					
+						end
 					elseif (fontString.isCritNumber[fontString.anchorFrame] > 5) then
 						fontString:SetAlpha(0);
 					end
 				end
-				
+
 				-- handle non crit
 				if (not fontString.pow) then
 					if (not fontString.hasBeenPlaced) then
 						fontString.offsetY = 20
 					end
-							
+
 					-- disappear if lots of crits
 					if (GetFourthCrit(fontString.anchorFrame) ~= nil and fontString.hideNonCritsIfBigCritChain) then
 						fontString:SetAlpha(0)
 					end
-					
-							
-					-- non crit position	
+
+
+					-- non crit position
 					local closestFontStringY = GetClosestDamageNumberYValueFrom(fontString);
-				
-					if closestFontStringY ~= nil and elapsed < 0.1 then		
-						local differenceFromClosest = math.abs(fontString.offsetY - closestFontStringY.offsetY)					
-						if (differenceFromClosest < 30) then			
+
+					if closestFontStringY ~= nil and elapsed < 0.1 then
+						local differenceFromClosest = math.abs(fontString.offsetY - closestFontStringY.offsetY)
+						if (differenceFromClosest < 30) then
 							if (fontString.offsetX == 0 and closestFontStringY.offsetX == 0) then
 								fontString.offsetX = 80
 							elseif (fontString.offsetX == 80 and closestFontStringY.offsetX == 80) then
 								fontString.offsetX = -80
 						end
 							if (fontString.offsetY2 ~= 0 and fontString.offsetX == -80 and closestFontStringY.offsetX == -80) then
-								closestFontStringY.offsetY2 = LibEasing.OutQuad(1.1, 20, fontString.scrollDistance, animationDuration)	
+								closestFontStringY.offsetY2 = LibEasing.OutQuad(1.1, 20, fontString.scrollDistance, animationDuration)
 								closestFontStringY.offsetX = math.random(-1, 1) * 80
 							end
 						end
 					end
-					if (fontString.offsetY2 ~= nil) then					
+					if (fontString.offsetY2 ~= nil) then
 						fontString.offsetY = LibEasing.OutQuad(elapsed, 20, fontString.scrollDistance, animationDuration) + fontString.offsetY2;
 					else
-						fontString.offsetY = LibEasing.OutQuad(elapsed, 20, fontString.scrollDistance, animationDuration)					
+						fontString.offsetY = LibEasing.OutQuad(elapsed, 20, fontString.scrollDistance, animationDuration)
 					end
-				end			
-				
+				end
+
                 if (fontString.anchorFrame and fontString.anchorFrame:IsShown()) then
 					if (fontString.pow) then
 						fontString:SetPoint("CENTER", fontString.anchorFrame, "CENTER", fontString.offsetX + fontString.critsOffsetX, fontString.offsetY + fontString.critsOffsetY);
@@ -378,16 +377,16 @@ end
 function ClassicNumbers:Animate(fontString, anchorFrame, animation)
     fontString.animatingStartTime = GetTime();
     fontString.anchorFrame = anchorFrame == player and UIParent or anchorFrame;
-	
+
 	if ((fontString.pow and self.db.global.critSize > 0) or (not fontString.pow and self.db.global.size > 0)) then
 		animating[fontString] = true;
 	end
-	
+
 	if (fontString.pow) then
 		fontString.isCritNumber[fontString.anchorFrame] = 0;
 		OffsetCritIndexes(fontString.anchorFrame, 1, false);
 	end
-	
+
     -- start onupdate if it's not already running
     if (ClassicNumbers.frame:GetScript("OnUpdate") == nil) then
         ClassicNumbers.frame:SetScript("OnUpdate", AnimationOnUpdate);
@@ -416,44 +415,61 @@ function ClassicNumbers:NAME_PLATE_UNIT_REMOVED(event, unitID)
     end
 end
 
-function ClassicNumbers:CombatFilter(_, clue, _, sourceGUID, _, sourceFlags, _, destGUID, _, _, _, ...)
-	if playerGUID == sourceGUID or (ClassicNumbers.db.global.personal and playerGUID == destGUID) then -- Player events
-		local destUnit = guidToUnit[destGUID];
-		if (destUnit) or (destGUID == playerGUID and ClassicNumbers.db.global.personal) then
-			if (string.find(clue, "_DAMAGE")) then
-				local spellID, spellName, spellSchool, amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing, isOffHand;
-				if (string.find(clue, "SWING")) then
-					spellName, amount, overkill, school_ignore, resisted, blocked, absorbed, critical, glancing, crushing, isOffHand = "ranged", ...;
-				elseif (string.find(clue, "ENVIRONMENTAL")) then
-					spellName, amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing = ...;
-				else
-					spellID, spellName, spellSchool, amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing, isOffHand = ...;
-				end
-				self:DamageEvent(destGUID, spellID, amount, school, critical, spellName);
-			end
-		end
-	elseif (bit.band(sourceFlags, COMBATLOG_OBJECT_TYPE_GUARDIAN) > 0 or bit.band(sourceFlags, COMBATLOG_OBJECT_TYPE_PET) > 0)	and bit.band(sourceFlags, COMBATLOG_OBJECT_AFFILIATION_MINE) > 0 then -- Pet/Guardian events
-		local destUnit = guidToUnit[destGUID];
-		if (destUnit) or (destGUID == playerGUID and ClassicNumbers.db.global.personal) then
-			if (string.find(clue, "_DAMAGE")) then
-				local spellID, spellName, spellSchool, amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing, isOffHand;
-				if (string.find(clue, "SWING")) then
-					spellName, amount, overkill, school_ignore, resisted, blocked, absorbed, critical, glancing, crushing, isOffHand = "pet", ...;
-				elseif (string.find(clue, "ENVIRONMENTAL")) then
-					spellName, amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing = ...;
-				else
-					spellID, spellName, spellSchool, amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing, isOffHand = ...;
-				end
-				self:DamageEvent(destGUID, spellID, amount, "pet", critical, spellName);
-			end
-		end
-	end
+function ClassicNumbers:CombatFilter(clue, sourceGUID, sourceFlags, destGUID, destFlags, ...)
+    if playerGUID == sourceGUID or (ClassicNumbers.db.global.personal and playerGUID == destGUID) then
+        local destUnit = guidToUnit[destGUID]
+        if destUnit or (destGUID == playerGUID and ClassicNumbers.db.global.personal) then
+            if clue:find("_DAMAGE") then
+                local spellID, spellName, spellSchool
+                local amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing
+
+                if clue:find("SWING") then
+                    -- SWING_DAMAGE:
+                    -- amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing
+                    spellName, amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing = "ranged", ...;
+                elseif clue:find("ENVIRONMENTAL") then
+                    -- ENVIRONMENTAL_DAMAGE:
+                    -- envType, amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing
+                    local envType
+                    envType, amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing = ...;
+                else
+                    -- SPELL_DAMAGE / RANGE_DAMAGE / SPELL_PERIODIC_DAMAGE:
+                    -- spellID, spellName, spellSchool, amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing
+                    spellID, spellName, spellSchool, amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing = ...;
+                end
+
+                self:DamageEvent(destGUID, spellID, amount, school, critical, spellName)
+            end
+        end
+
+    -- Pet/Guardian
+    elseif (bit.band(sourceFlags, COMBATLOG_OBJECT_TYPE_GUARDIAN) > 0
+        or bit.band(sourceFlags, COMBATLOG_OBJECT_TYPE_PET) > 0)
+        and bit.band(sourceFlags, COMBATLOG_OBJECT_AFFILIATION_MINE) > 0 then
+
+        if clue:find("_DAMAGE") then
+            local isPet = true
+            local spellID, spellName, spellSchool
+            local amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing
+
+            if clue:find("SWING") then
+                spellName, amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing = "pet", ...;
+            elseif clue:find("ENVIRONMENTAL") then
+                local envType
+                envType, amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing = ...;
+            else
+                spellID, spellName, spellSchool, amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing = ...;
+            end
+
+            self:DamageEvent(destGUID, spellID, amount, "pet", critical, spellName)
+        end
+    end
 end
 
-function ClassicNumbers:COMBAT_LOG_EVENT_UNFILTERED ()
-	return ClassicNumbers:CombatFilter(CombatLogGetCurrentEventInfo())
+function ClassicNumbers:COMBAT_LOG_EVENT_UNFILTERED(event, ...)
+    local _, clue, sourceGUID, _, sourceFlags, destGUID, _, destFlags = ...
+    return self:CombatFilter(clue, sourceGUID, sourceFlags, destGUID, destFlags, select(9, ...))
 end
-
 
 -- DISPLAY --
 local function commaSeperate(number)
@@ -471,11 +487,11 @@ function ClassicNumbers:DamageEvent(guid, spellID, amount, school, crit, spellNa
     local unit = guidToUnit[guid];
     local isTarget = unit and UnitIsUnit(unit, "target");
 
-	size = ClassicNumbers.db.global.size;	    
+	size = ClassicNumbers.db.global.size;
     if (crit) and playerGUID ~= guid then
-        size = self.db.global.critSize;      
+        size = self.db.global.critSize;
     end
-    
+
 	if (pow and amount < self.db.global.smallCritsFilter) then
 		pow = false;
 		size = self.db.global.size * 1.5;
@@ -483,16 +499,16 @@ function ClassicNumbers:DamageEvent(guid, spellID, amount, school, crit, spellNa
 	if (not pow and amount < self.db.global.smallHitsFilter or size == 0) then
 		return;
 	end
-	
+
 	-- truncate
 	if (self.db.global.truncate and amount >= 1000000) then
 		text = string.format("%.1fM", amount / 1000000);
 	elseif (self.db.global.truncate and amount >= 10000) then
 		text = string.format("%.0f", amount / 1000);
-		text = text.."k";		
+		text = text.."k";
 	elseif (self.db.global.truncate and amount >= 1000) then
 		text = string.format("%.1f", amount / 1000);
-			text = text.."k";		
+			text = text.."k";
 	else
 		if (self.db.global.commaSeperate) then
 			text = commaSeperate(amount);
@@ -503,8 +519,8 @@ function ClassicNumbers:DamageEvent(guid, spellID, amount, school, crit, spellNa
 
 	-- color text
 	if guid ~= playerGUID then
-		if autoattack then 
-			text = "|Cff"..self.db.global.defaultColor..text.."|r";		
+		if autoattack then
+			text = "|Cff"..self.db.global.defaultColor..text.."|r";
 		elseif school and DAMAGE_TYPE_COLORS[school] then
 			if self.db.global.useDamageSchoolColors then
 				text = "|Cff"..DAMAGE_TYPE_COLORS[school]..text.."|r";
@@ -569,16 +585,16 @@ function ClassicNumbers:DisplayText(guid, text, size, animation, pow, amount)
 	fontString.critAnimationDuration = ClassicNumbers.db.global.critAnimationDuration;
 	fontString.scrollSpeed = ClassicNumbers.db.global.scrollSpeed
 	fontString.scrollDistance = ClassicNumbers.db.global.scrollDistance;
-	fontString.hideNonCritsIfBigCritChain = ClassicNumbers.db.global.hideNonCritsIfBigCritChain;	
+	fontString.hideNonCritsIfBigCritChain = ClassicNumbers.db.global.hideNonCritsIfBigCritChain;
 	fontString.displayBiggestCritInCenterOfTheChain = ClassicNumbers.db.global.displayBiggestCritInCenterOfTheChain;
 	fontString.biggestCritDisplaysLargerThanOtherOnes = ClassicNumbers.db.global.biggestCritDisplaysLargerThanOtherOnes;
-	
+
 	--Sound effects
 	 if (ClassicNumbers.db.global.critSoundEnabled and pow and amount > ClassicNumbers.db.global.critSoundThreshold and (not ClassicNumbers.db.global.hugeCritSoundEnabled or amount < ClassicNumbers.db.global.hugeCritSoundThreshold))
 	 then
 		PlaySoundFile("Interface\\AddOns\\ClassicNumbers\\Media\\Sounds\\Critical.ogg", ClassicNumbers.db.global.critSoundChannel)
 	 end
-	
+
 	 if (ClassicNumbers.db.global.hugeCritSoundEnabled and pow and amount > ClassicNumbers.db.global.hugeCritSoundThreshold and (not ClassicNumbers.db.global.monsterCritSoundEnabled or amount < ClassicNumbers.db.global.monsterCritSoundThreshold))
 	 then
 		 PlaySoundFile("Interface\\AddOns\\ClassicNumbers\\Media\\Sounds\\HugeCritical.ogg", ClassicNumbers.db.global.hugeCritSoundChannel)
@@ -588,18 +604,17 @@ function ClassicNumbers:DisplayText(guid, text, size, animation, pow, amount)
 	 then
 		PlaySoundFile("Interface\\AddOns\\ClassicNumbers\\Media\\Sounds\\MonsterCritical.ogg", ClassicNumbers.db.global.monsterCritSoundChannel)
 	end
-	
-	
+
+
 	if (self.db.global.useLegacyOverlapHandler) then
 		fontString.offsetY2 = 0
 	end
-	
+
     if (fontString.startHeight <= 0) then
         fontString.startHeight = 5;
     end
 
     fontString.unit = unit;
-
     self:Animate(fontString, nameplate, animation);
 end
 
@@ -620,30 +635,56 @@ local menu = {
             order = 1,
             width = "full",
         },
-		
+
 		disableBlizzardNumbers = {
             type = 'toggle',
             name = "Disable Blizzard numbers",
             desc = "Hide Blizzard's default combat text",
-            get = function(_, newValue) return GetCVar("floatingCombatTextCombatDamage") == "0" end,
+            get = function(_, newValue) return GetCVar("CombatDamage") == "0" end,
             set = function(_, newValue)
                 if (newValue) then
-                    SetCVar("floatingCombatTextCombatDamage", "0");
+					SetCVar("CombatDamage", 0)
+					SetCVar("CombatLogPeriodicSpells", 0)
+					SetCVar("PetMeleeDamage", 0)
+					SetCVar("CombatHealing", 0)
+					SetCVar("enableCombatText", 0)
+					_G["SHOW_COMBAT_TEXT"] = "0"
+					SetCVar("fctCombatState", 0)
+					_G["COMBAT_TEXT_SHOW_COMBAT_STATE"] = "0"
+					SetCVar("fctDodgeParryMiss", 0)
+					_G["COMBAT_TEXT_SHOW_DODGE_PARRY_MISS"] = "0"
+					SetCVar("fctDamageReduction", 0)
+					_G["COMBAT_TEXT_SHOW_RESISTANCES"] = "0"
+					SetCVar("fctFriendlyHealers", 0)
+					_G["COMBAT_TEXT_SHOW_FRIENDLY_NAMES"] = "0"
                 else
-                    SetCVar("floatingCombatTextCombatDamage", "1");
+					SetCVar("CombatDamage", 1)
+					SetCVar("CombatLogPeriodicSpells", 1)
+					SetCVar("PetMeleeDamage", 1)
+					SetCVar("CombatHealing", 1)
+					SetCVar("enableCombatText", 1)
+					_G["SHOW_COMBAT_TEXT"] = "1"
+					SetCVar("fctCombatState", 1)
+					_G["COMBAT_TEXT_SHOW_COMBAT_STATE"] = "1"
+					SetCVar("fctDodgeParryMiss", 1)
+					_G["COMBAT_TEXT_SHOW_DODGE_PARRY_MISS"] = "1"
+					SetCVar("fctDamageReduction", 1)
+					_G["COMBAT_TEXT_SHOW_RESISTANCES"] = "1"
+					SetCVar("fctFriendlyHealers", 1)
+					_G["COMBAT_TEXT_SHOW_FRIENDLY_NAMES"] = "1"
                 end
             end,
             order = 2,
             width = "full",
         },
-		
+
 		textStyle = {
             type = 'group',
             name = "Text Style",
             order = 3,
             inline = true,
             disabled = function() return not ClassicNumbers.db.global.enabled; end;
-            args = {		
+            args = {
 				truncateBigNumbers = {
 					type = 'toggle',
 					name = "Truncate big numbers",
@@ -709,7 +750,7 @@ local menu = {
 					get = function() return ClassicNumbers.db.global.size; end,
 					set = function(_, newValue) ClassicNumbers.db.global.size = newValue; end,
 					order = 1,
-				},			
+				},
 				nonCritsOffsetX = {
 					type = 'range',
 					name = "Position Offset X",
@@ -720,7 +761,7 @@ local menu = {
 					get = function() return ClassicNumbers.db.global.nonCritsOffsetX; end,
 					set = function(_, newValue) ClassicNumbers.db.global.nonCritsOffsetX = newValue; end,
 					order = 2,
-				},			
+				},
 				nonCritsOffsetY = {
 					type = 'range',
 					name = "Position Offset Y",
@@ -774,7 +815,7 @@ local menu = {
 					get = function() return ClassicNumbers.db.global.smallHitsFilter; end,
 					set = function(_, newValue) ClassicNumbers.db.global.smallHitsFilter = newValue; end,
 					order = 7,
-				},	
+				},
 			}
 		},
 
@@ -840,7 +881,7 @@ local menu = {
 					set = function(_, newValue) ClassicNumbers.db.global.critsAlpha = newValue; end,
 					order = 5,
 				},
-				
+
 				critAnimationDuration = {
 					type = 'range',
 					name = "Display duration (seconds)",
@@ -873,10 +914,10 @@ local menu = {
 					get = function() return ClassicNumbers.db.global.maxCritNumbersPerTarget; end,
 					set = function(_, newValue) ClassicNumbers.db.global.maxCritNumbersPerTarget = newValue; end,
 					order = 4,
-				},	
+				},
 			}
 		},
-		
+
 		CritSound = {
             type = 'group',
             name = "Crit sound effect",
@@ -918,7 +959,7 @@ local menu = {
                 },
 			}
 		},
-		
+
 		HugeCritSound = {
             type = 'group',
             name = "HUGE Crit sound effect",
@@ -960,7 +1001,7 @@ local menu = {
                 },
 			}
 		},
-		
+
 		 MonsterCritSound = {
           type = 'group',
            name = "MONSTER Crit sound effect",
@@ -1004,22 +1045,22 @@ local menu = {
 		}
 	}
 }
-		
+
 -- Utils functions --
 
 function GetBiggestCrit(anchorFrame)
+	local biggestCrit
 	for fontString, _ in pairs(animating) do
-		local biggestCrit = nil
-		
+
 		if fontString.isCritNumber[anchorFrame] ~= nil and fontString.isCritNumber[anchorFrame] > 0 then
 			if biggestCrit == nil then
 				biggestCrit = fontString
 			elseif fontString.amount >= biggestCrit.amount then
 				biggestCrit = fontString
 			end
-		end			
+		end
 	end
-	
+
 	return biggestCrit
 end
 
@@ -1027,18 +1068,18 @@ function OffsetCritIndexes(anchorFrame, offset, resetIndexesBefore)
 	local crits = {}
 	for fontString, _ in pairs(animating) do
 		if (fontString.pow and fontString.anchorFrame == anchorFrame) then
-			if resetIndexesBefore then 
+			if resetIndexesBefore then
 				crits[fontString] = true;
 				fontString.isCritNumber[fontString.anchorFrame] = 0
 			else
 				fontString.isCritNumber[fontString.anchorFrame] = fontString.isCritNumber[fontString.anchorFrame] + offset
 			end
 		end
-	end	
-	
+	end
+
 	if resetIndexesBefore then
 	local count = 0
-		for crit, _ in pairs(crits) do		
+		for crit, _ in pairs(crits) do
 			count = count + 1
 			crit.isCritNumber[crit.anchorFrame] = 1 + count
 		end
@@ -1047,7 +1088,7 @@ end
 
 function GetNewestCrit(anchorFrame)
 	local newestCrit = nil
-	
+
 	for fontString,  _ in pairs(animating) do
 		if (fontString.anchorFrame == anchorFrame and fontString.isCritNumber[fontString.anchorFrame] == 1) then
 			newestCrit = fontString
@@ -1058,7 +1099,7 @@ end
 
 function GetFourthCrit(anchorFrame)
 	local newestCrit = nil
-	
+
 	for fontString,  _ in pairs(animating) do
 		if (fontString.anchorFrame == anchorFrame and fontString.isCritNumber[fontString.anchorFrame] == 4) then
 			newestCrit = fontString
@@ -1070,7 +1111,7 @@ end
 function GetClosestDamageNumberYValueFrom(fs)
 	local closestValue = 999
 	local closestFontString = nil
-	
+
 	for fontString, _ in pairs(animating) do
 		if fontString.offsetY2 == 0 then
 			if fontString ~= fs and not fontString.pow and not fs.pow and fontString.anchorFrame == fs.anchorFrame then
@@ -1078,15 +1119,15 @@ function GetClosestDamageNumberYValueFrom(fs)
 				if difference < closestValue and fontString.offsetX == fs.offsetX then
 					closestValue = difference;
 					closestFontString = fontString;
-				end	
-			end		
+				end
+			end
 		else
 			if fontString ~= fs and not fontString.pow and not fs.pow and fontString.anchorFrame == fs.anchorFrame and fontString.offsetY2 == nil and fs.offsetY2 == nil then
 				local difference = math.abs(fontString.offsetY - fs.offsetY)
 				if difference < closestValue and fontString.offsetX == fs.offsetX then
 					closestValue = difference;
 					closestFontString = fontString;
-				end	
+				end
 			end
 		end
 
@@ -1094,11 +1135,12 @@ function GetClosestDamageNumberYValueFrom(fs)
 	return closestFontString;
 end
 
-function ClassicNumbers:OpenMenu()
-	Settings.OpenToCategory("ClassicNumbers")
+function ClassicNumbers:OpenMenu(...)
+	ACD:SetDefaultSize("ClassicNumbers", 635, 500)
+	ACD:Open("ClassicNumbers")
 end
 
 function ClassicNumbers:RegisterMenu()
     LibStub("AceConfigRegistry-3.0"):RegisterOptionsTable("ClassicNumbers", menu);
-    self.menu = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("ClassicNumbers", "ClassicNumbers");
+    self.menu = ACD:AddToBlizOptions("ClassicNumbers", "ClassicNumbers");
 end

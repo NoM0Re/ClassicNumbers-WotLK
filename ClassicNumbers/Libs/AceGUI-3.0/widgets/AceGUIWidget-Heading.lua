@@ -1,7 +1,7 @@
 --[[-----------------------------------------------------------------------------
 Heading Widget
 -------------------------------------------------------------------------------]]
-local Type, Version = "Heading", 20
+local Type, Version = "Heading", 21
 local AceGUI = LibStub and LibStub("AceGUI-3.0", true)
 if not AceGUI or (AceGUI:GetWidgetVersion(Type) or 0) >= Version then return end
 
@@ -39,7 +39,7 @@ local methods = {
 Constructor
 -------------------------------------------------------------------------------]]
 local function Constructor()
-	local frame = CreateFrame("Frame", nil, UIParent)
+	local frame = CreateFrame("Frame", string.format("%s%d", Type, AceGUI:GetNextWidgetNum(Type)), UIParent)
 	frame:Hide()
 
 	local label = frame:CreateFontString(nil, "BACKGROUND", "GameFontNormal")
@@ -51,14 +51,14 @@ local function Constructor()
 	left:SetHeight(8)
 	left:SetPoint("LEFT", 3, 0)
 	left:SetPoint("RIGHT", label, "LEFT", -5, 0)
-	left:SetTexture(137057) -- Interface\\Tooltips\\UI-Tooltip-Border
+	left:SetTexture("Interface\\Tooltips\\UI-Tooltip-Border")
 	left:SetTexCoord(0.81, 0.94, 0.5, 1)
 
 	local right = frame:CreateTexture(nil, "BACKGROUND")
 	right:SetHeight(8)
 	right:SetPoint("RIGHT", -3, 0)
 	right:SetPoint("LEFT", label, "RIGHT", 5, 0)
-	right:SetTexture(137057) -- Interface\\Tooltips\\UI-Tooltip-Border
+	right:SetTexture("Interface\\Tooltips\\UI-Tooltip-Border")
 	right:SetTexCoord(0.81, 0.94, 0.5, 1)
 
 	local widget = {

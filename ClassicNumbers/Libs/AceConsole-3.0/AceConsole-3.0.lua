@@ -9,7 +9,7 @@
 -- make into AceConsole.
 -- @class file
 -- @name AceConsole-3.0
--- @release $Id: AceConsole-3.0.lua 1284 2022-09-25 09:15:30Z nevcairiel $
+-- @release $Id$
 local MAJOR,MINOR = "AceConsole-3.0", 7
 
 local AceConsole, oldminor = LibStub:NewLibrary(MAJOR, MINOR)
@@ -28,6 +28,10 @@ local max = math.max
 
 -- WoW APIs
 local _G = _G
+
+-- Global vars/functions that we don't upvalue since they might get hooked, or upgraded
+-- List them here for Mikk's FindGlobals script
+-- GLOBALS: DEFAULT_CHAT_FRAME, SlashCmdList, hash_SlashCmdList
 
 local tmp={}
 local function Print(self,frame,...)
@@ -170,7 +174,7 @@ function AceConsole:GetArgs(str, numargs, startpos)
 
 	while true do
 		-- find delimiter or hyperlink
-		local _
+		local ch,_
 		pos,_,ch = strfind(str, delim_or_pipe, pos)
 
 		if not pos then break end

@@ -1,7 +1,7 @@
 --[[-----------------------------------------------------------------------------
 EditBox Widget
 -------------------------------------------------------------------------------]]
-local Type, Version = "EditBox", 29
+local Type, Version = "EditBox", 30
 local AceGUI = LibStub and LibStub("AceGUI-3.0", true)
 if not AceGUI or (AceGUI:GetWidgetVersion(Type) or 0) >= Version then return end
 
@@ -10,7 +10,8 @@ local tostring, pairs = tostring, pairs
 
 -- WoW APIs
 local PlaySound = PlaySound
-local GetCursorInfo, ClearCursor = GetCursorInfo, ClearCursor
+local GetMacroInfo = GetMacroInfo
+local GetCursorInfo, ClearCursor, GetSpellInfo = GetCursorInfo, ClearCursor, GetSpellInfo
 local CreateFrame, UIParent = CreateFrame, UIParent
 local _G = _G
 
@@ -69,23 +70,19 @@ local function EditBox_OnEnterPressed(frame)
 	local value = frame:GetText()
 	local cancel = self:Fire("OnEnterPressed", value)
 	if not cancel then
-		PlaySound(856) -- SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON
+		PlaySound("igMainMenuOptionCheckBoxOn")
 		HideButton(self)
 	end
 end
 
 local function EditBox_OnReceiveDrag(frame)
 	local self = frame.obj
-	local type, id, info, extra = GetCursorInfo()
+	local type, id, info = GetCursorInfo()
 	local name
 	if type == "item" then
 		name = info
 	elseif type == "spell" then
-		if C_Spell and C_Spell.GetSpellName then
-			name = C_Spell.GetSpellName(extra)
-		else
-			name = GetSpellInfo(id, info)
-		end
+		name = GetSpellInfo(id, info)
 	elseif type == "macro" then
 		name = GetMacroInfo(id)
 	end
@@ -210,7 +207,7 @@ Constructor
 -------------------------------------------------------------------------------]]
 local function Constructor()
 	local num  = AceGUI:GetNextWidgetNum(Type)
-	local frame = CreateFrame("Frame", nil, UIParent)
+	local frame = CreateFrame("Frame", string.format("%s%d", Type, num), UIParent)
 	frame:Hide()
 
 	local editbox = CreateFrame("EditBox", "AceGUI-3.0EditBox"..num, frame, "InputBoxTemplate")

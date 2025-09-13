@@ -1,4 +1,4 @@
-## Interface: 11502, 11503, 20504, 30403, 40400, 100207, 110000, 110002
+## Interface: 30300
 ## Version: 1.3
 ## Title: ClassicNumbers
 ## Author: zeldarsprod

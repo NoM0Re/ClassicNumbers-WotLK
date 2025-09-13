@@ -53,9 +53,9 @@ local LayoutRegistry = AceGUI.LayoutRegistry
 local WidgetVersions = AceGUI.WidgetVersions
 
 --[[
-	 xpcall safecall implementation
+	 pcall safecall implementation
 ]]
-local xpcall = xpcall
+local pcall = pcall
 
 local function errorhandler(err)
 	return geterrorhandler()(err)
@@ -63,7 +63,11 @@ end
 
 local function safecall(func, ...)
 	if func then
-		return xpcall(func, errorhandler, ...)
+		local ret = {pcall(func, ...)}
+		if not ret[1] then
+			errorhandler(ret[2])
+		end
+		return unpack(ret)
 	end
 end
 
@@ -482,14 +486,14 @@ do
 		end
 	end
 
-	local function FrameResize(this)
+	local function FrameResize(this, width, height)
 		local self = this.obj
 		if this:GetWidth() and this:GetHeight() then
 			if self.OnWidthSet then
-				self:OnWidthSet(this:GetWidth())
+				self:OnWidthSet(width or this:GetWidth())
 			end
 			if self.OnHeightSet then
-				self:OnHeightSet(this:GetHeight())
+				self:OnHeightSet(height or this:GetHeight())
 			end
 		end
 	end

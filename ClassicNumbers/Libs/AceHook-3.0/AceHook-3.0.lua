@@ -9,8 +9,8 @@
 -- make into AceHook.
 -- @class file
 -- @name AceHook-3.0
--- @release $Id: AceHook-3.0.lua 1284 2022-09-25 09:15:30Z nevcairiel $
-local ACEHOOK_MAJOR, ACEHOOK_MINOR = "AceHook-3.0", 9
+-- @release $Id$
+local ACEHOOK_MAJOR, ACEHOOK_MINOR = "AceHook-3.0", 8
 local AceHook, oldminor = LibStub:NewLibrary(ACEHOOK_MAJOR, ACEHOOK_MINOR)
 
 if not AceHook then return end -- No upgrade needed
@@ -195,6 +195,7 @@ function hook(self, obj, method, handler, script, secure, raw, forceSecure, usag
 			registry[self][method] = nil
 		end
 		handlers[uid], actives[uid], scripts[uid] = nil, nil, nil
+		uid = nil
 	end
 
 	local orig
@@ -477,10 +478,10 @@ function AceHook:UnhookAll()
 	for key, value in pairs(registry[self]) do
 		if type(key) == "table" then
 			for method in pairs(value) do
-				AceHook.Unhook(self, key, method)
+				self:Unhook(key, method)
 			end
 		else
-			AceHook.Unhook(self, key)
+			self:Unhook(key)
 		end
 	end
 end

@@ -1,0 +1,11 @@
+## Interface: 11502, 11503, 20504, 30403, 40400, 100207, 110000, 110002
+## Version: 1.3
+## Title: ClassicNumbers
+## Author: zeldarsprod
+## SavedVariables: ClassicNumbersDB
+## Notes: Vanilla style damage popping.
+## OptionalDeps: Ace3, LibEasing
+
+embeds.xml
+
+ClassicNumbers.lua

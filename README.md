@@ -8,6 +8,8 @@
 
 <img src="https://i.ibb.co/DPYcKx5Z/cnscreenshot.png">
 
+</div>
+
 ## Quick Start
 
 To open the options window, type `/cn` or `/classicnumbers` or `/classicnumber` into your chat and hit enter.

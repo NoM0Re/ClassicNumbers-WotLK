@@ -11,6 +11,7 @@ ClassicNumbers.frame = CreateFrame("Frame", nil, UIParent);
 local animating = {}
 
 local playerGUID;
+local targetGUID;
 local unitToGuid = {};
 local guidToUnit = {};
 
@@ -57,10 +58,11 @@ local defaults = {
 		critSoundThreshold = 10000,
 		hugeCritSoundEnabled = false,
 		hugeCritSoundChannel = "Dialog",
-		hugeCritSoundThreshold = 100000,
+		hugeCritSoundThreshold = 15000,
 		monsterCritSoundEnabled = false,
 		monsterCritSoundChannel = "Dialog",
-		monsterCritSoundThreshold = 1000000,
+		monsterCritSoundThreshold = 20000,
+		onlyTargetNumbers = false,
     },
 };
 
@@ -197,10 +199,12 @@ end
 
 function ClassicNumbers:OnEnable()
     playerGUID = UnitGUID("player");
+	targetGUID = UnitGUID("target");
 
     self:RegisterEvent("NAME_PLATE_UNIT_ADDED");
     self:RegisterEvent("NAME_PLATE_UNIT_REMOVED");
     self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED");
+	self:RegisterEvent("PLAYER_TARGET_CHANGED")
 
     self.db.global.enabled = true;
 end
@@ -416,9 +420,9 @@ function ClassicNumbers:NAME_PLATE_UNIT_REMOVED(event, unitID)
 end
 
 function ClassicNumbers:CombatFilter(clue, sourceGUID, sourceFlags, destGUID, destFlags, ...)
-    if playerGUID == sourceGUID or (ClassicNumbers.db.global.personal and playerGUID == destGUID) then
+    if playerGUID == sourceGUID then
         local destUnit = guidToUnit[destGUID]
-        if destUnit or (destGUID == playerGUID and ClassicNumbers.db.global.personal) then
+        if destUnit then
             if clue:find("_DAMAGE") then
                 local spellID, spellName, spellSchool
                 local amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing
@@ -466,9 +470,15 @@ function ClassicNumbers:CombatFilter(clue, sourceGUID, sourceFlags, destGUID, de
     end
 end
 
+function ClassicNumbers:PLAYER_TARGET_CHANGED()
+  targetGUID = UnitGUID("target")
+end
+
 function ClassicNumbers:COMBAT_LOG_EVENT_UNFILTERED(event, ...)
     local _, clue, sourceGUID, _, sourceFlags, destGUID, _, destFlags = ...
-    return self:CombatFilter(clue, sourceGUID, sourceFlags, destGUID, destFlags, select(9, ...))
+	if not (ClassicNumbers.db.global.onlyTargetNumbers and targetGUID ~= destGUID) then
+	    return self:CombatFilter(clue, sourceGUID, sourceFlags, destGUID, destFlags, select(9, ...))
+	end
 end
 
 -- DISPLAY --
@@ -676,6 +686,15 @@ local menu = {
             end,
             order = 2,
             width = "full",
+		},
+		onlyTargetNumbers = {
+			type = 'toggle',
+			name = "Show numbers only on Target",
+			desc = "Show damage numbers only for your current target",
+			get = function() return ClassicNumbers.db.global.onlyTargetNumbers; end,
+			set = function(_, newValue) ClassicNumbers.db.global.onlyTargetNumbers = newValue; end,
+			order = 3,
+			width = "full",
         },
 
 		textStyle = {

@@ -21,6 +21,9 @@ local soundChannels = {
   ["SFX"] = "SFX",
 };
 
+local C_NamePlate = C_NamePlate or {};
+C_NamePlate.GetNamePlateForUnit = C_NamePlate.GetNamePlateForUnit or function() end;
+
 -- DB --
 local defaultFont = "Friz Quadrata TT";
 
@@ -376,7 +379,7 @@ end
 
 function ClassicNumbers:Animate(fontString, anchorFrame, animation)
     fontString.animatingStartTime = GetTime();
-    fontString.anchorFrame = anchorFrame == player and UIParent or anchorFrame;
+    fontString.anchorFrame = anchorFrame == "player" and UIParent or anchorFrame;
 
 	if ((fontString.pow and self.db.global.critSize > 0) or (not fontString.pow and self.db.global.size > 0)) then
 		animating[fontString] = true;
@@ -556,7 +559,7 @@ function ClassicNumbers:DisplayText(guid, text, size, animation, pow, amount)
 
     -- if there isn't an anchor frame, make sure that there is a guidNameplatePosition cache entry
     if playerGUID == guid and not unit then
-          nameplate = player
+    	nameplate = "player"
     elseif (not nameplate) then
         return;
     end

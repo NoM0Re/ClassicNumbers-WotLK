@@ -14,6 +14,11 @@ local playerGUID;
 local targetGUID;
 local unitToGuid = {};
 local guidToUnit = {};
+local unitToNameplate = {};
+local recentNameplates = {};
+local ghostAnchorCache = {};
+
+local RECENT_NAMEPLATE_TTL = 3;
 
 local soundChannels = {
   ["Dialog"] = "Dialog",
@@ -24,6 +29,77 @@ local soundChannels = {
 
 local C_NamePlate = C_NamePlate or {};
 C_NamePlate.GetNamePlateForUnit = C_NamePlate.GetNamePlateForUnit or function() end;
+
+local function recycleGhostAnchor(anchor)
+    if not anchor then
+        return;
+    end
+
+    anchor:Hide();
+    anchor:ClearAllPoints();
+    table.insert(ghostAnchorCache, anchor);
+end
+
+local function clearRecentNameplate(guid)
+    local recent = guid and recentNameplates[guid];
+    if recent then
+        recentNameplates[guid] = nil;
+        recycleGhostAnchor(recent.anchor);
+    end
+end
+
+local function getRecentNameplateAnchor(guid)
+    local recent = recentNameplates[guid];
+    if not recent then
+        return;
+    end
+
+    if recent.expires <= GetTime() then
+        clearRecentNameplate(guid);
+        return;
+    end
+
+    return recent.anchor;
+end
+
+local function clearExpiredNameplates()
+    local now = GetTime();
+    for guid, recent in pairs(recentNameplates) do
+        if recent.expires <= now then
+            clearRecentNameplate(guid);
+        end
+    end
+end
+
+local function cacheNameplatePosition(guid, nameplate)
+    if not guid or not nameplate then
+        return;
+    end
+
+    local x, y = nameplate:GetCenter();
+    if not x or not y then
+        return;
+    end
+
+    clearExpiredNameplates();
+    clearRecentNameplate(guid);
+
+    local anchor = table.remove(ghostAnchorCache);
+    if not anchor then
+        anchor = CreateFrame("Frame", nil, UIParent);
+        anchor:SetWidth(1);
+        anchor:SetHeight(1);
+    end
+
+    anchor:ClearAllPoints();
+    anchor:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x, y);
+    anchor:Show();
+
+    recentNameplates[guid] = {
+        anchor = anchor,
+        expires = GetTime() + RECENT_NAMEPLATE_TTL,
+    };
+end
 
 -- DB --
 local defaultFont = "Friz Quadrata TT";
@@ -405,15 +481,21 @@ end
 function ClassicNumbers:NAME_PLATE_UNIT_ADDED(event, unitID)
     local guid = UnitGUID(unitID);
 
+    clearRecentNameplate(guid);
     unitToGuid[unitID] = guid;
     guidToUnit[guid] = unitID;
+    unitToNameplate[unitID] = C_NamePlate.GetNamePlateForUnit(unitID);
 end
 
 function ClassicNumbers:NAME_PLATE_UNIT_REMOVED(event, unitID)
     local guid = unitToGuid[unitID];
+    local nameplate = unitToNameplate[unitID] or C_NamePlate.GetNamePlateForUnit(unitID);
+
+    cacheNameplatePosition(guid, nameplate);
 
     unitToGuid[unitID] = nil;
     guidToUnit[guid] = nil;
+    unitToNameplate[unitID] = nil;
 
 	for fontString, _ in pairs(animating) do
 		if fontString.unit == unitID then
@@ -425,27 +507,27 @@ end
 function ClassicNumbers:CombatFilter(clue, sourceGUID, sourceFlags, destGUID, destFlags, ...)
     if playerGUID == sourceGUID then
         local destUnit = guidToUnit[destGUID]
-        if destUnit then
-            if clue:find("_DAMAGE") then
-                local spellID, spellName, spellSchool
-                local amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing
+        if clue:find("_DAMAGE") then
+            local spellID, spellName, spellSchool
+            local amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing
 
-                if clue:find("SWING") then
-                    -- SWING_DAMAGE:
-                    -- amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing
-                    spellName, amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing = "ranged", ...;
-                elseif clue:find("ENVIRONMENTAL") then
-                    -- ENVIRONMENTAL_DAMAGE:
-                    -- envType, amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing
-                    local envType
-                    envType, amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing = ...;
-                else
-                    -- SPELL_DAMAGE / RANGE_DAMAGE / SPELL_PERIODIC_DAMAGE:
-                    -- spellID, spellName, spellSchool, amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing
-                    spellID, spellName, spellSchool, amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing = ...;
-                end
+            if clue:find("SWING") then
+                -- SWING_DAMAGE:
+                -- amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing
+                spellName, amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing = "ranged", ...;
+            elseif clue:find("ENVIRONMENTAL") then
+                -- ENVIRONMENTAL_DAMAGE:
+                -- envType, amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing
+                local envType
+                envType, amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing = ...;
+            else
+                -- SPELL_DAMAGE / RANGE_DAMAGE / SPELL_PERIODIC_DAMAGE:
+                -- spellID, spellName, spellSchool, amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing
+                spellID, spellName, spellSchool, amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing = ...;
+            end
 
-                self:DamageEvent(destGUID, spellID, amount, school, critical, spellName)
+            if destUnit or (overkill and overkill > 0 and getRecentNameplateAnchor(destGUID)) then
+                self:DamageEvent(destGUID, spellID, amount, school, critical, spellName, overkill)
             end
         end
 
@@ -468,7 +550,7 @@ function ClassicNumbers:CombatFilter(clue, sourceGUID, sourceFlags, destGUID, de
                 spellID, spellName, spellSchool, amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing = ...;
             end
 
-            self:DamageEvent(destGUID, spellID, amount, "pet", critical, spellName)
+            self:DamageEvent(destGUID, spellID, amount, "pet", critical, spellName, overkill)
         end
     end
 end
@@ -491,7 +573,7 @@ local function commaSeperate(number)
     return minus..int:reverse():gsub("^,", "")..fraction;
 end
 
-function ClassicNumbers:DamageEvent(guid, spellID, amount, school, crit, spellName)
+function ClassicNumbers:DamageEvent(guid, spellID, amount, school, crit, spellName, overkill)
     local text, animation, pow, size, icon;
 	local autoattack = not spellID or spellID == 75;
 
@@ -555,16 +637,18 @@ function ClassicNumbers:DamageEvent(guid, spellID, amount, school, crit, spellNa
 		end
 	end
 
-	self:DisplayText(guid, text, size, animation, pow, amount);
+	self:DisplayText(guid, text, size, animation, pow, amount, overkill);
 end
 
-function ClassicNumbers:DisplayText(guid, text, size, animation, pow, amount)
+function ClassicNumbers:DisplayText(guid, text, size, animation, pow, amount, overkill)
     local fontString;
     local unit = guidToUnit[guid];
     local nameplate;
 
     if (unit) then
         nameplate = C_NamePlate.GetNamePlateForUnit(unit);
+    elseif overkill and overkill > 0 then
+        nameplate = getRecentNameplateAnchor(guid);
     end
 
     -- if there isn't an anchor frame, make sure that there is a guidNameplatePosition cache entry

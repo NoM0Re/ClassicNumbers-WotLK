@@ -2,6 +2,7 @@
 local AceAddon = LibStub("AceAddon-3.0");
 local LibEasing = LibStub("LibEasing-1.0");
 local SharedMedia = LibStub("LibSharedMedia-3.0");
+local LibNameplates = LibStub("LibNameplates-1.0");
 local ACD = LibStub("AceConfigDialog-3.0")
 
 ClassicNumbers = AceAddon:NewAddon("ClassicNumbers", "AceConsole-3.0", "AceEvent-3.0");
@@ -27,8 +28,17 @@ local soundChannels = {
   ["SFX"] = "SFX",
 };
 
+local hasModernNameplates = C_NamePlate and type(C_NamePlate.GetNamePlateForUnit) == "function";
 local C_NamePlate = C_NamePlate or {};
 C_NamePlate.GetNamePlateForUnit = C_NamePlate.GetNamePlateForUnit or function() end;
+
+local function getLegacyTargetNameplate(guid)
+    if hasModernNameplates or not guid or guid ~= UnitGUID("target") then
+        return;
+    end
+
+    return LibNameplates:GetTargetNameplate();
+end
 
 local function recycleGhostAnchor(anchor)
     if not anchor then
@@ -280,8 +290,10 @@ function ClassicNumbers:OnEnable()
     playerGUID = UnitGUID("player");
 	targetGUID = UnitGUID("target");
 
-    self:RegisterEvent("NAME_PLATE_UNIT_ADDED");
-    self:RegisterEvent("NAME_PLATE_UNIT_REMOVED");
+    if hasModernNameplates then
+        self:RegisterEvent("NAME_PLATE_UNIT_ADDED");
+        self:RegisterEvent("NAME_PLATE_UNIT_REMOVED");
+    end
     self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED");
 	self:RegisterEvent("PLAYER_TARGET_CHANGED")
 
@@ -507,6 +519,7 @@ end
 function ClassicNumbers:CombatFilter(clue, sourceGUID, sourceFlags, destGUID, destFlags, ...)
     if playerGUID == sourceGUID then
         local destUnit = guidToUnit[destGUID]
+        local legacyTarget = getLegacyTargetNameplate(destGUID);
         if clue:find("_DAMAGE") then
             local spellID, spellName, spellSchool
             local amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing
@@ -526,7 +539,7 @@ function ClassicNumbers:CombatFilter(clue, sourceGUID, sourceFlags, destGUID, de
                 spellID, spellName, spellSchool, amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing = ...;
             end
 
-            if destUnit or (overkill and overkill > 0 and getRecentNameplateAnchor(destGUID)) then
+            if destUnit or legacyTarget or (overkill and overkill > 0 and getRecentNameplateAnchor(destGUID)) then
                 self:DamageEvent(destGUID, spellID, amount, school, critical, spellName, overkill)
             end
         end
@@ -647,6 +660,8 @@ function ClassicNumbers:DisplayText(guid, text, size, animation, pow, amount, ov
 
     if (unit) then
         nameplate = C_NamePlate.GetNamePlateForUnit(unit);
+    elseif not hasModernNameplates then
+        nameplate = getLegacyTargetNameplate(guid);
     elseif overkill and overkill > 0 then
         nameplate = getRecentNameplateAnchor(guid);
     end

@@ -30,14 +30,24 @@ Small crit filter: choose a number -> crits will be displayed as if it was a non
 Max crits displayed per target: only display the X newest crits per target, set to one to have a MOP style where only the latest crit is displayed
 Use damage school colors: fire damage will be orange, frost damage will be blue, etc... if disabled, all abilities damage will be yellow"
 
-## Client Extensions
+## Client Support
 
-* [Awesome WotLK](https://github.com/NoM0Re/WeakAuras-WotLK/wiki/awesome_wotlk): Adds modern retail-style nameplate search functions, unit tracking, and events. Additionally adds the modern Text-to-Speech functions to the client. This is required to operate the AddOn.
+Enemy nameplates must be enabled for ClassicNumbers to display damage.
+
+### Standard 3.3.5a Client
+
+ClassicNumbers displays damage for the player's current target only. Off-target damage is intentionally hidden because the standard client cannot reliably associate every enemy with its nameplate.
+
+### Awesome WotLK Client
+
+[Awesome WotLK](https://github.com/NoM0Re/WeakAuras-WotLK/wiki/awesome_wotlk) is optional. Its modern nameplate API provides reliable unit tracking, allowing ClassicNumbers to display damage on all visible nameplates.
 
 ## Install
-1. This AddOn requires [Awesome WotLK](https://github.com/NoM0Re/WeakAuras-WotLK/wiki/awesome_wotlk) without it is not possible to use it, and will error or not work!
-2. [Download the package](https://github.com/NoM0Re/ClassicNumbers-WotLK/archive/refs/heads/main.zip).
+
+1. [Download the package](https://github.com/NoM0Re/ClassicNumbers-WotLK/archive/refs/heads/main.zip).
+2. Optionally install [Awesome WotLK](https://github.com/NoM0Re/WeakAuras-WotLK/wiki/awesome_wotlk) for damage numbers on all visible nameplates.
 3. Open the archive, then open folder `ClassicNumbers-WotLK-main`, extract the folder to `Interface\AddOns`.
 
 ## Problems
+
 * If you've discovered something that's clearly wrong, or if you get an error, please create a [ticket](https://github.com/NoM0Re/ClassicNumbers-WotLK/issues).

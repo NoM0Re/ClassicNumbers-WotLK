@@ -32,14 +32,6 @@ local hasModernNameplates = C_NamePlate and type(C_NamePlate.GetNamePlateForUnit
 local C_NamePlate = C_NamePlate or {};
 C_NamePlate.GetNamePlateForUnit = C_NamePlate.GetNamePlateForUnit or function() end;
 
-local function getLegacyTargetNameplate(guid)
-    if hasModernNameplates or not guid or guid ~= UnitGUID("target") then
-        return;
-    end
-
-    return LibNameplates:GetTargetNameplate();
-end
-
 local function recycleGhostAnchor(anchor)
     if not anchor then
         return;
@@ -110,6 +102,224 @@ local function cacheNameplatePosition(guid, nameplate)
         expires = GetTime() + RECENT_NAMEPLATE_TTL,
     };
 end
+
+-- The 3.3.5a client has GUID-bearing unit IDs, but no nameplate unit IDs.
+-- This resolver only accepts observable one-to-one relationships: target,
+-- mouseover, or a raid icon unique on both a known unit and a visible plate.
+local LegacyNameplates = {
+    byGUID = {},
+    byPlate = {},
+    previousCandidates = {},
+    unitIDs = {"target", "mouseover", "focus", "focustarget", "pettarget"},
+    scanAttempts = 0,
+};
+
+for index = 1, 4 do
+    table.insert(LegacyNameplates.unitIDs, "party" .. index .. "target");
+    table.insert(LegacyNameplates.unitIDs, "partypet" .. index .. "target");
+end
+for index = 1, 40 do
+    table.insert(LegacyNameplates.unitIDs, "raid" .. index .. "target");
+    table.insert(LegacyNameplates.unitIDs, "raidpet" .. index .. "target");
+end
+for index = 1, 5 do
+    table.insert(LegacyNameplates.unitIDs, "boss" .. index);
+    table.insert(LegacyNameplates.unitIDs, "arena" .. index);
+end
+
+LegacyNameplates.frame = CreateFrame("Frame");
+LegacyNameplates.frame:Hide();
+LegacyNameplates.eventFrame = CreateFrame("Frame");
+LegacyNameplates.events = {
+    "UPDATE_MOUSEOVER_UNIT",
+    "PLAYER_FOCUS_CHANGED",
+    "UNIT_TARGET",
+    "RAID_TARGET_UPDATE",
+    "PARTY_MEMBERS_CHANGED",
+    "RAID_ROSTER_UPDATE",
+};
+
+function LegacyNameplates:Forget(nameplate)
+    if not nameplate then
+        return;
+    end
+
+    local related = {
+        nameplate,
+        LibNameplates.realPlate[nameplate],
+        LibNameplates.fakePlate[nameplate],
+    };
+    for _, plate in pairs(related) do
+        local guid = self.byPlate[plate];
+        self.byPlate[plate] = nil;
+        if guid and self.byGUID[guid] == plate then
+            self.byGUID[guid] = nil;
+        end
+    end
+end
+
+function LegacyNameplates:Verify(guid, nameplate)
+    if not guid or not nameplate or not nameplate:IsShown() then
+        return;
+    end
+
+    self:Forget(nameplate);
+    self:Forget(self.byGUID[guid]);
+    clearRecentNameplate(guid);
+    self.byGUID[guid] = nameplate;
+    self.byPlate[nameplate] = guid;
+end
+
+function LegacyNameplates:Get(guid)
+    if hasModernNameplates or not guid then
+        return;
+    end
+
+    local nameplate = self.byGUID[guid];
+    if nameplate and nameplate:IsShown() and self.byPlate[nameplate] == guid then
+        return nameplate;
+    end
+    self:Forget(nameplate);
+    self:QueueScan();
+end
+
+function LegacyNameplates:FindHighlighted(kind)
+    if not UnitExists(kind) or UnitIsUnit(kind, "player") then
+        return;
+    end
+    if kind == "mouseover" and GetMouseFocus() ~= WorldFrame then
+        return;
+    end
+
+    local candidate;
+    for _, rawNameplate in LibNameplates:IteratePlates() do
+        local nameplate = LibNameplates.fakePlate[rawNameplate] or rawNameplate;
+        local matches = kind == "target" and LibNameplates:IsTarget(nameplate, true)
+            or kind == "mouseover" and LibNameplates:IsMouseover(nameplate);
+        if nameplate:IsShown() and matches then
+            if candidate and candidate ~= nameplate then
+                return;
+            end
+            candidate = nameplate;
+        end
+    end
+    return candidate;
+end
+
+function LegacyNameplates:CollectCandidates()
+    local byGUID, byPlate = {}, {};
+    local function add(guid, nameplate)
+        if not guid or not nameplate then
+            return;
+        end
+
+        local guidCandidate = byGUID[guid];
+        byGUID[guid] = guidCandidate == nil and nameplate
+            or guidCandidate == nameplate and nameplate or false;
+        local plateCandidate = byPlate[nameplate];
+        byPlate[nameplate] = plateCandidate == nil and guid
+            or plateCandidate == guid and guid or false;
+    end
+
+    add(UnitGUID("target"), self:FindHighlighted("target"));
+    add(UnitGUID("mouseover"), self:FindHighlighted("mouseover"));
+
+    local guidByIcon, plateByIcon = {}, {};
+    for _, unitID in ipairs(self.unitIDs) do
+        if UnitExists(unitID) and not UnitIsUnit(unitID, "player") then
+            local icon, guid = GetRaidTargetIndex(unitID), UnitGUID(unitID);
+            if icon and icon > 0 and guid then
+                local current = guidByIcon[icon];
+                guidByIcon[icon] = current == nil and guid
+                    or current == guid and guid or false;
+            end
+        end
+    end
+    for _, rawNameplate in LibNameplates:IteratePlates() do
+        local nameplate = LibNameplates.fakePlate[rawNameplate] or rawNameplate;
+        local icon = nameplate:IsShown() and LibNameplates:GetRaidIcon(nameplate);
+        if icon and icon > 0 then
+            local current = plateByIcon[icon];
+            plateByIcon[icon] = current == nil and nameplate
+                or current == nameplate and nameplate or false;
+        end
+    end
+    for icon, guid in pairs(guidByIcon) do
+        if guid and plateByIcon[icon] then
+            add(guid, plateByIcon[icon]);
+        end
+    end
+
+    return byGUID, byPlate;
+end
+
+function LegacyNameplates:Scan()
+    local candidates, reverseCandidates = self:CollectCandidates();
+    local nextCandidates = {};
+
+    for guid, nameplate in pairs(candidates) do
+        if nameplate and reverseCandidates[nameplate] == guid then
+            nextCandidates[guid] = nameplate;
+            -- Reject transient target fades and stale raid icons by requiring
+            -- the same one-to-one pair in two consecutive scans.
+            if self.previousCandidates[guid] == nameplate then
+                self:Verify(guid, nameplate);
+            end
+        end
+    end
+
+    self.previousCandidates = nextCandidates;
+    self.scanAttempts = self.scanAttempts - 1;
+    if self.scanAttempts <= 0 then
+        self.frame:Hide();
+        wipe(self.previousCandidates);
+    end
+end
+
+function LegacyNameplates:QueueScan(reset)
+    if hasModernNameplates then
+        return;
+    end
+    if reset then
+        wipe(self.previousCandidates);
+    end
+    if not self.frame:IsShown() or reset then
+        self.scanAttempts = 5;
+        self.frame:Show();
+    elseif self.scanAttempts < 2 then
+        self.scanAttempts = 2;
+    end
+end
+
+function LegacyNameplates:Reset()
+    wipe(self.byGUID);
+    wipe(self.byPlate);
+    wipe(self.previousCandidates);
+    self.scanAttempts = 0;
+    self.frame:Hide();
+end
+
+function LegacyNameplates:Enable()
+    LibNameplates.RegisterCallback(self, "LibNameplates_NewNameplate");
+    LibNameplates.RegisterCallback(self, "LibNameplates_RecycleNameplate");
+    for _, event in ipairs(self.events) do
+        self.eventFrame:RegisterEvent(event);
+    end
+    self:QueueScan(true);
+end
+
+function LegacyNameplates:Disable()
+    LibNameplates.UnregisterAllCallbacks(self);
+    self.eventFrame:UnregisterAllEvents();
+    self:Reset();
+end
+
+LegacyNameplates.frame:SetScript("OnUpdate", function()
+    LegacyNameplates:Scan();
+end);
+LegacyNameplates.eventFrame:SetScript("OnEvent", function()
+    LegacyNameplates:QueueScan();
+end);
 
 -- DB --
 local defaultFont = "Friz Quadrata TT";
@@ -293,6 +503,8 @@ function ClassicNumbers:OnEnable()
     if hasModernNameplates then
         self:RegisterEvent("NAME_PLATE_UNIT_ADDED");
         self:RegisterEvent("NAME_PLATE_UNIT_REMOVED");
+    else
+        LegacyNameplates:Enable();
     end
     self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED");
 	self:RegisterEvent("PLAYER_TARGET_CHANGED")
@@ -302,6 +514,10 @@ end
 
 function ClassicNumbers:OnDisable()
     self:UnregisterAllEvents();
+
+    if not hasModernNameplates then
+        LegacyNameplates:Disable();
+    end
 
     for fontString, _ in pairs(animating) do
         recycleFontString(fontString);
@@ -490,6 +706,53 @@ end
 
 
 -- EVENTS --
+local function recycleLegacyNameplateAnimations(nameplate)
+    local realNameplate = nameplate and LibNameplates.realPlate[nameplate];
+    local fakeNameplate = nameplate and LibNameplates.fakePlate[nameplate];
+
+    for fontString in pairs(animating) do
+        local anchor = fontString.anchorFrame;
+        if anchor == nameplate or anchor == realNameplate or anchor == fakeNameplate then
+            recycleFontString(fontString);
+        end
+    end
+end
+
+function LegacyNameplates:LibNameplates_NewNameplate(event, nameplate)
+    if not nameplate then
+        return;
+    end
+
+    recycleLegacyNameplateAnimations(nameplate);
+    self:Forget(nameplate);
+    self:QueueScan(true);
+end
+
+function LegacyNameplates:LibNameplates_RecycleNameplate(event, nameplate)
+    if not nameplate then
+        return;
+    end
+
+    local verifiedNameplate = nameplate;
+    local guid = self.byPlate[verifiedNameplate];
+
+    if not guid and LibNameplates.fakePlate[nameplate] then
+        verifiedNameplate = LibNameplates.fakePlate[nameplate];
+        guid = self.byPlate[verifiedNameplate];
+    elseif not guid and LibNameplates.realPlate[nameplate] then
+        verifiedNameplate = LibNameplates.realPlate[nameplate];
+        guid = self.byPlate[verifiedNameplate];
+    end
+
+    if guid then
+        cacheNameplatePosition(guid, verifiedNameplate);
+    end
+
+    recycleLegacyNameplateAnimations(nameplate);
+    self:Forget(nameplate);
+    self:QueueScan(true);
+end
+
 function ClassicNumbers:NAME_PLATE_UNIT_ADDED(event, unitID)
     local guid = UnitGUID(unitID);
 
@@ -519,7 +782,7 @@ end
 function ClassicNumbers:CombatFilter(clue, sourceGUID, sourceFlags, destGUID, destFlags, ...)
     if playerGUID == sourceGUID then
         local destUnit = guidToUnit[destGUID]
-        local legacyTarget = getLegacyTargetNameplate(destGUID);
+        local legacyNameplate = LegacyNameplates:Get(destGUID);
         if clue:find("_DAMAGE") then
             local spellID, spellName, spellSchool
             local amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing
@@ -539,7 +802,7 @@ function ClassicNumbers:CombatFilter(clue, sourceGUID, sourceFlags, destGUID, de
                 spellID, spellName, spellSchool, amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing = ...;
             end
 
-            if destUnit or legacyTarget or (overkill and overkill > 0 and getRecentNameplateAnchor(destGUID)) then
+            if destUnit or legacyNameplate or (overkill and overkill > 0 and getRecentNameplateAnchor(destGUID)) then
                 self:DamageEvent(destGUID, spellID, amount, school, critical, spellName, overkill)
             end
         end
@@ -569,7 +832,8 @@ function ClassicNumbers:CombatFilter(clue, sourceGUID, sourceFlags, destGUID, de
 end
 
 function ClassicNumbers:PLAYER_TARGET_CHANGED()
-  targetGUID = UnitGUID("target")
+    targetGUID = UnitGUID("target")
+    LegacyNameplates:QueueScan(true);
 end
 
 function ClassicNumbers:COMBAT_LOG_EVENT_UNFILTERED(event, ...)
@@ -661,8 +925,10 @@ function ClassicNumbers:DisplayText(guid, text, size, animation, pow, amount, ov
     if (unit) then
         nameplate = C_NamePlate.GetNamePlateForUnit(unit);
     elseif not hasModernNameplates then
-        nameplate = getLegacyTargetNameplate(guid);
-    elseif overkill and overkill > 0 then
+        nameplate = LegacyNameplates:Get(guid);
+    end
+
+    if not nameplate and overkill and overkill > 0 then
         nameplate = getRecentNameplateAnchor(guid);
     end
 

@@ -36,7 +36,7 @@ Enemy nameplates must be enabled for ClassicNumbers to display damage.
 
 ### Standard 3.3.5a Client
 
-ClassicNumbers displays damage for the player's current target only. Off-target damage is intentionally hidden because the standard client cannot reliably associate every enemy with its nameplate.
+ClassicNumbers displays damage for nameplates verified through a stable target or mouseover match. It can also learn raid-marked enemies exposed by focus, pet, party/raid-target, boss, or arena unit IDs when one raid icon identifies exactly one GUID and one visible nameplate. Unknown or ambiguous nameplates are intentionally ignored instead of guessing by name or health.
 
 ### Awesome WotLK Client
 
